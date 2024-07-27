@@ -50,6 +50,8 @@ export class ComfortCloud {
         this._ccAppVersion = value;
     }
 
+    public oauthClient: OAuthClient
+
     constructor(username: string, password: string) {
         this._config.username = username;
         this._config.password = password;
@@ -79,18 +81,23 @@ export class ComfortCloud {
      * @param password Login password
      * @returns LoginResponse containing access token.
      */
-    public async login(username: string = this._config.username, password: string = this._config.password): Promise<LoginResponse | undefined> {
+    public async login(username: string = this._config.username, password: string = this._config.password): Promise<string> {
         if (!username || !password) throw new Error("Username and password must contain a value.");
         this._ccAppVersion = await this.getCcAppVersion();
-        const data = new LoginRequest(username, password);
-        const uri = url.parse(`${this._config.base_url}${this._config.login_url}`, true);
-        const options: RequestOptions = this.getRequestOptions(HttpMethod.Post, uri);
-        const result = await this.request(options, JSON.stringify(data));
-        if (result?.uToken) {
-            this._accessToken = result.uToken;
-            this._clientId = result.clientId;
-            return result as LoginResponse;
-        }
+
+        this.oauthClient = new OAuthClient(this._ccAppVersion)
+
+
+        try {
+            const token = await this.oauthClient.oAuthProcess(username, password)
+            const clientId = await this.getClientId(token)
+
+            this._accessToken = token;
+            this._clientId = clientId;
+          } catch (error) {
+            this.handleError(error)
+          }
+
         return undefined;
     }
 
